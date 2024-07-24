@@ -30,7 +30,20 @@ func main() {
 		fmt.Printf("%v \r\n", err)
 		return
 	}
-	parseMakeHTML(urls, dst)
+	for _, url := range urls {
+		//попытка парсинга по текущему элементу среза
+		resp, err := getBodyFromHTTP(url)
+		if err != nil {
+			fmt.Printf("ошибка при парсинге с url %s: %v \r\n", url, err)
+		} else {
+			//попытка создания html-файла для текущего элемента среза
+			err = createHTML(resp, dst, url)
+			if err != nil {
+				fmt.Printf("ошибка при создании HTML-файла страницы %s: %v\r\n", url, err)
+			}
+		}
+
+	}
 	//время завершения программы
 	finish := time.Since(start).Truncate(10 * time.Millisecond).String()
 	fmt.Println("Время выполнения программы:", finish)
@@ -75,6 +88,7 @@ func checkOrCreateDir(path string) error {
 func readLinesFromFile(src string) ([]string, error) {
 	//открываем файл
 	file, err := os.Open(src)
+	defer file.Close()
 	if err != nil {
 		return []string{}, fmt.Errorf("ошибка при открытии файла с url: %v", err)
 	}
@@ -85,26 +99,7 @@ func readLinesFromFile(src string) ([]string, error) {
 		//добавляем в срез текущую строку файла
 		urls = append(urls, formatURL(scanner.Text()))
 	}
-	defer file.Close()
 	return urls, nil
-}
-
-// parseMakeHTML - парсинг по url из среза и создание html-файла в случае успеха
-func parseMakeHTML(urls []string, dst string) {
-	for i := 0; i < len(urls); i++ {
-		//попытка парсинга по текущему элементу среза
-		resp, err := parse(urls[i])
-		if err != nil {
-			fmt.Printf("ошибка при парсинге с url %s: %v \r\n", urls[i], err)
-		} else {
-			//попытка создания html-файла для текущего элемента среза
-			err = createHTML(resp, dst, urls[i])
-			if err != nil {
-				fmt.Printf("ошибка при создании HTML-файла страницы %s: %v\r\n", urls[i], err)
-			}
-		}
-
-	}
 }
 
 // formatURL - проверка наличия "http://" в начале строки
@@ -119,21 +114,23 @@ func formatURL(urlWithoutPrefix string) string {
 	return url
 }
 
-// parse - get-запрос и возврат тела ответа
-func parse(url string) ([]byte, error) {
+// getBodyFromHTTP - get-запрос и возврат тела ответа
+func getBodyFromHTTP(url string) ([]byte, error) {
 
 	//отправка get запроса
 	resp, err := http.Get(url)
+
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при открытии url %s: %v", url, err)
 	}
+	defer resp.Body.Close()
 	//чтение тела ответа
 	b, err := io.ReadAll(resp.Body)
+
 	if err != nil {
 		return b, fmt.Errorf("ошибка при получении тела запроса %s: %v", url, err)
 	}
-	defer resp.Body.Close()
-	return []byte(b), err
+	return b, err
 }
 
 // createHTML - создание HTML на основе полученного ответа
@@ -141,12 +138,12 @@ func createHTML(resp []byte, dst, url string) error {
 	nameHTML := fmt.Sprintf("%s%s.html", dst, strings.Replace(url, "/", "|", -1))
 	//создание html-файла
 	file, err := os.Create(nameHTML)
+	defer file.Close()
 	if err != nil {
 		return fmt.Errorf("ошибка при cоздании файла %s: %v", nameHTML, err)
 	}
 	//запись ответа на запрос в файл
 	file.Write([]byte(resp))
 	fmt.Printf("Страница %s успешно сохранена \r\n", url)
-	defer file.Close()
 	return nil
 }
