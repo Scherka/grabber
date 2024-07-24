@@ -6,67 +6,86 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
 
-var dst = ""    //переменная каталога, в которую будут записаны файлы
-var counter = 1 //счётчик успешно записанных файлов
-
 func main() {
-	start := time.Now()                             //время начал программы
-	srcfl := flag.String("src", "url.txt", "third") //флаг файла
-	dirfl := flag.String("dst", "`/dst/", "third")  //флаг папки
-	flag.Parse()
-	dst = *dirfl
-	CheckDir(dst)                       //проверяем наличие каталога, создаём, если его нет
-	if !(strings.HasSuffix(dst, "/")) { //добавление "/" к концу введённого каталога, если его нет
-		dst += "/"
-	}
-
-	fmt.Println("Открываем", *srcfl)
-	src := *srcfl
-	ReadLines(src)              //считывание содержимого файла построчно
-	finish := time.Since(start) //время завершения программы
+	//время начала программы
+	start := time.Now()
+	FlagParsing()
+	//время завершения программы
+	finish := time.Since(start)
 	fmt.Println("Время выполнения программы:", finish)
 }
-func CheckDir(path string) {
-	if _, err := os.Stat(path); os.IsNotExist(err) { //проверка существования каталога
-		os.Mkdir(path, os.ModeDir|0755) //создание каталога
+
+// FlagParsing - обработка флагов
+func FlagParsing() {
+	//флаг файла
+	srcfl := flag.String("src", "url.txt", "third")
+	//флаг папки
+	dirfl := flag.String("dst", "./dst/", "third")
+	flag.Parse()
+	fmt.Println("Открываем", *srcfl)
+	//проверяем наличие каталога, создаём, если его нет
+	CheckDir(*dirfl)
+	//считывание содержимого файла построчно
+	if !(strings.HasSuffix(*dirfl, "/")) {
+		//добавление "/" к концу введённого каталога, если его нет
+		ReadLines(*srcfl, fmt.Sprintf("%s/", *dirfl))
+	} else {
+		ReadLines(*srcfl, *dirfl)
 	}
 }
 
-func ReadLines(src string) {
-	file, err := os.Open(src) //открываем файл
+// CheckDir - проверка существования директории и её создание в случае отсутствия
+func CheckDir(path string) {
+	//проверка существования каталога
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		//создание каталога
+		os.Mkdir(path, os.ModeDir|0755)
+	}
+}
+
+// ReadLines - построчное чтение файла с url
+func ReadLines(src string, dst string) {
+	//открываем файл
+	file, err := os.Open(src)
 	if err != nil {
 		fmt.Println(err)
 	}
 	scanner := bufio.NewScanner(file)
-	for scanner.Scan() { //проходим все строки документа
-		line := scanner.Text()
-		Parse(line) //
+	//проходим все строки документа
+	for scanner.Scan() {
+		Parse(scanner.Text(), dst)
 	}
 }
-func Parse(urlog string) {
+
+// Parse - get-запрос и запись ответа в .html-файл
+func Parse(urlWithoutPrefix string, dst string) {
+
 	var url string
-	if !(strings.HasPrefix(urlog, "http://")) || !(strings.HasPrefix(urlog, "https://")) { //проверка наличия "http:// в начале строки"
-		url = "http://" + urlog //приведение url  к нужному формату
+	//проверка наличия "http:// в начале строки"
+	if !(strings.HasPrefix(urlWithoutPrefix, "http://")) || !(strings.HasPrefix(urlWithoutPrefix, "https://")) {
+		//приведение url  к нужному формату
+		url = fmt.Sprintf("http://%s", urlWithoutPrefix)
 	} else {
-		url = urlog
+		url = urlWithoutPrefix
 	}
-	resp, err := http.Get(url) //отправка get запроса
+	//отправка get запроса
+	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("Не удалось открыть '" + urlog + "'")
+		fmt.Printf("Не удалось открыть '%s' \r\n", urlWithoutPrefix)
 	} else {
-		//t := time.Now()
-		file, err := os.Create(dst + "file" + strconv.Itoa(counter) + ".html") //создание html-файла
+		//создание html-файла
+		file, err := os.Create(fmt.Sprintf("%s%s.html", dst, strings.Replace(urlWithoutPrefix, "/", "|", -1)))
 		if err != nil {
 			fmt.Println("Ошибка при создании файла")
+		} else {
+			//запись ответа на запрос в файл
+			resp.Write(file)
+			fmt.Printf("Страница %s успешно сохранена \r\n", urlWithoutPrefix)
 		}
-		resp.Write(file) //запись ответа на запрос в файл
-		fmt.Println("Страница " + urlog + " успешно сохранена")
 		file.Close()
-		counter++
 	}
 }
