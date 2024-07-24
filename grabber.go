@@ -66,8 +66,9 @@ func checkOrCreateDir(path string) error {
 	return nil
 }
 
-// ReadLines - построчное чтение файла с url
+// readLinesFromFileRunParseMakeHTML - построчное чтение url из файла
 func readLinesFromFileRunParseMakeHTML(src string, dst string) error {
+	//создаём группу ожидания
 	//открываем файл
 	file, err := os.Open(src)
 	if err != nil {
@@ -76,11 +77,19 @@ func readLinesFromFileRunParseMakeHTML(src string, dst string) error {
 	scanner := bufio.NewScanner(file)
 	//проходим все строки документа
 	for scanner.Scan() {
+		scan := formatURL(scanner.Text())
+		func() {
+			resp, err := parse(scan)
+			if err != nil {
+				fmt.Println(err)
 
-		err = parse(formatURL(scanner.Text()), dst)
-		if err != nil {
-			fmt.Println(err)
-		}
+			} else {
+				err = createHTML(*resp, dst, scan)
+				if err != nil {
+					fmt.Println(err)
+				}
+			}
+		}()
 	}
 	return nil
 }
@@ -98,19 +107,16 @@ func formatURL(urlWithoutPrefix string) string {
 }
 
 // Parse - get-запрос и возврат ответа-
-func parse(url string, dst string) error {
+func parse(url string) (*http.Response, error) {
 
 	//отправка get запроса
 	resp, err := http.Get(url)
 	if err != nil {
 		//fmt.Printf("Не удалось открыть '%s' \r\n", url)
-		return fmt.Errorf("ошибка при открытии url %s: %v", url, err)
+		return nil, fmt.Errorf("ошибка при открытии url %s: %v", url, err)
 	}
-	err = createHTML(*resp, dst, url)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return resp, err
 }
 
 // createHTML - создание HTML на основе полученного ответа
