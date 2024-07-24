@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -49,6 +50,8 @@ func CheckDir(path string) {
 
 // ReadLines - построчное чтение файла с url
 func ReadLines(src string, dst string) {
+	//создаём группу ожидания
+	wg := sync.WaitGroup{}
 	//открываем файл
 	file, err := os.Open(src)
 	if err != nil {
@@ -57,13 +60,24 @@ func ReadLines(src string, dst string) {
 	scanner := bufio.NewScanner(file)
 	//проходим все строки документа
 	for scanner.Scan() {
-		Parse(scanner.Text(), dst)
+		//Увеличиваем размер группы
+		wg.Add(1)
+		//считываем строку из файла
+		scan := scanner.Text()
+		go func() {
+
+			Parse(scan, dst)
+			//уменьшаем размер группы
+			defer wg.Done()
+		}()
+
 	}
+	//ждём завершения всех горутин
+	wg.Wait()
 }
 
 // Parse - get-запрос и запись ответа в .html-файл
 func Parse(urlWithoutPrefix string, dst string) {
-
 	var url string
 	//проверка наличия "http:// в начале строки"
 	if !(strings.HasPrefix(urlWithoutPrefix, "http://")) || !(strings.HasPrefix(urlWithoutPrefix, "https://")) {
