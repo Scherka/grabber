@@ -88,10 +88,10 @@ func checkOrCreateDir(path string) error {
 func readLinesFromFile(src string) ([]string, error) {
 	//открываем файл
 	file, err := os.Open(src)
-	defer file.Close()
 	if err != nil {
 		return []string{}, fmt.Errorf("ошибка при открытии файла с url: %v", err)
 	}
+	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	//создаём срез url-в
 	var urls []string
@@ -138,10 +138,10 @@ func createHTML(resp []byte, dst, url string) error {
 	nameHTML := fmt.Sprintf("%s%s.html", dst, strings.Replace(url, "/", "|", -1))
 	//создание html-файла
 	file, err := os.Create(nameHTML)
-	defer file.Close()
 	if err != nil {
 		return fmt.Errorf("ошибка при cоздании файла %s: %v", nameHTML, err)
 	}
+	defer file.Close()
 	//запись ответа на запрос в файл
 	file.Write([]byte(resp))
 	fmt.Printf("Страница %s успешно сохранена \r\n", url)
